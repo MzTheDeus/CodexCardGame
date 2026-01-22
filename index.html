@@ -1,0 +1,1886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Codex CardGame Prototype</title>
+  <style>
+    :root {
+      --table-1: #0f2a2f;
+      --table-2: #11363d;
+      --table-3: #0c1c21;
+      --panel: rgba(255, 255, 255, 0.08);
+      --panel-strong: rgba(255, 255, 255, 0.14);
+      --panel-solid: #0f1c22;
+      --ink: #f4f4f4;
+      --muted: rgba(255, 255, 255, 0.6);
+      --accent: #ff7b3a;
+      --accent-2: #45d1c1;
+      --danger: #ff4d4d;
+      --ok: #6be46b;
+      --card: #f8f5ef;
+      --card-2: #e8f4ff;
+      --outline: rgba(255, 255, 255, 0.16);
+      --glow: rgba(255, 123, 58, 0.45);
+      --shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+      --radius: 14px;
+      --card-radius: 12px;
+      --chip: rgba(0, 0, 0, 0.18);
+      --hand-tilt: 14deg;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI Variable", "SF Pro Display", "Helvetica Neue", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at top, #21434a 0%, #0e2126 40%, #071216 100%);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .play-area { max-width: 100%; }
+    .table {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 18px;
+      padding: 24px 16px 28px;
+      align-items: start;
+    }
+    .sidebar {
+      display: grid;
+      gap: 14px;
+      position: sticky;
+      top: 18px;
+      align-self: start;
+    }
+    .play-area {
+      position: relative;
+      display: grid;
+      gap: 0;
+      align-items: center;
+      justify-items: center;
+      width: 100%;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--outline);
+      border-radius: 16px;
+      padding: 12px;
+      backdrop-filter: blur(8px);
+      box-shadow: var(--shadow);
+    }
+    .player-top { display: none; }
+    .player-zone {
+      display: grid;
+      grid-template-rows: auto auto;
+      gap: 6px;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      padding: 0;
+      width: 100%;
+      max-width: 900px;
+    }
+    .zone-stack {
+      display: grid;
+      gap: 6px;
+      width: 100%;
+    }
+    .player-zone.top .zone-stack .hand-wrapper { order: 1; }
+    .player-zone.top .zone-stack .board-wrapper { order: 2; }
+    .player-zone.bottom .zone-stack .board-wrapper { order: 1; }
+    .player-zone.bottom .zone-stack .hand-wrapper { order: 2; }
+    .player-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .player-name {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      color: var(--ink);
+    }
+    .player-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .meta-pill {
+      background: var(--panel-strong);
+      border-radius: 999px;
+      padding: 4px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+    .energy-bar {
+      width: 90px;
+      height: 300px;
+      object-fit: contain;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      padding: 0;
+    }
+    .hand-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: flex-end;
+      gap: 10px;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      touch-action: none;
+    }
+    .hand-row .hand-zone {
+      min-width: 0;
+    }
+    .board-zone, .hand-zone {
+      border-radius: 12px;
+      padding: 10px;
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      background: rgba(10, 18, 22, 0.45);
+      min-height: 120px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: center;
+      position: relative;
+      overflow: visible;
+    }
+    .board-zone {
+      min-height: 160px;
+      overflow: visible;
+    }
+    .hand-zone {
+      min-height: 150px;
+      justify-content: center;
+      align-items: flex-end;
+      background: rgba(255, 255, 255, 0.08);
+      flex-wrap: nowrap;
+      overflow: visible;
+      padding-bottom: 18px;
+      min-width: 0;
+    }
+    .hand-zone .card {
+      flex: 0 0 auto;
+    }
+    .zone-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin: 8px 0 6px;
+      text-align: center;
+    }
+    .center-hp {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 700;
+      color: var(--ink);
+      z-index: 5;
+      pointer-events: none;
+    }
+    .center-hp .hp-pill { pointer-events: auto; }
+    .hp-pill {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 999px;
+      min-width: 80px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .card {
+      width: 150px;
+      height: 216px;
+      border-radius: var(--card-radius);
+      background: var(--card);
+      color: #1a1a1a;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      box-shadow: 0 10px 18px rgba(0, 0, 0, 0.22);
+      padding: 8px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 6px;
+      position: relative;
+      cursor: grab;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      user-select: none;
+      touch-action: none;
+    }
+    .card.arted {
+      background: #101418;
+      color: #f3f3f3;
+      border-color: rgba(0, 0, 0, 0.4);
+    }
+    .card.arted .card-content { display: none; }
+    .card .card-art {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: var(--card-radius);
+      z-index: 1;
+    }
+    .card .card-content {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 6px;
+    }
+    .card.spell { background: var(--card-2); }
+    .card.back {
+      background: linear-gradient(145deg, #1d2b33, #0f181c);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: var(--ink);
+      cursor: default;
+    }
+    .card.back::after {
+      content: "CODEX";
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      letter-spacing: 2px;
+      opacity: 0.3;
+    }
+    .card:hover { transform: translateY(-4px) scale(1.02); box-shadow: 0 16px 24px rgba(0, 0, 0, 0.28); }
+    .card .cost {
+      position: absolute;
+      top: 22px;
+      left: 8px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: radial-gradient(circle at top, #fff0d5, #ff8a3d);
+      color: #0f1c22;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 12px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+      z-index: 3;
+    }
+    .card .name {
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .card .type-line {
+      font-size: 10px;
+      color: rgba(0, 0, 0, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .card .rules {
+      font-size: 11px;
+      line-height: 1.2;
+    }
+    .card .stats {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .pip {
+      padding: 4px 6px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.1);
+      min-width: 36px;
+      text-align: center;
+    }
+    .keyword {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--chip);
+      color: #0f1c22;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-right: 4px;
+    }
+    .keyword.guard { background: rgba(69, 209, 193, 0.25); }
+    .keyword.rush { background: rgba(255, 123, 58, 0.25); }
+    .keyword.sick { background: rgba(255, 77, 77, 0.25); }
+    .hand-card {
+      transform-origin: bottom center;
+      position: relative;
+    }
+    .hand-card[data-tilt] {
+      transform: translateY(calc(var(--tilt-offset) * -1)) rotate(var(--tilt-angle));
+    }
+    .hand-zone .card { margin-left: calc(var(--hand-overlap, 36px) * -1); }
+    .hand-zone .card:first-child { margin-left: 0; }
+    .hand-zone .card.touch-active {
+      transform: translateY(-18px) scale(1.08);
+      z-index: 5;
+      margin-left: 0 !important;
+      margin-right: 12px;
+    }
+    .center-panel {
+      display: grid;
+      gap: 10px;
+    }
+    .controls {
+      display: grid;
+      gap: 8px;
+    }
+    .end-turn-btn {
+      align-self: center;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #0f1c22;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+      white-space: nowrap;
+    }
+    .btn {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-weight: 700;
+      background: var(--accent);
+      color: #0f1c22;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn.secondary {
+      background: var(--panel-strong);
+      color: var(--ink);
+    }
+    .toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .toggle input { accent-color: var(--accent); }
+    .hint-bar {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .log-panel {
+      display: grid;
+      gap: 8px;
+    }
+    .log-panel.hidden {
+      display: none;
+    }
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .log {
+      max-height: 180px;
+      overflow-y: auto;
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 10px;
+      padding: 8px;
+    }
+    .log .error { color: #ff9b9b; }
+    .log.collapsed {
+      max-height: 110px;
+    }
+    .how-to {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .drop-target {
+      outline: 2px solid var(--accent-2);
+      box-shadow: 0 0 0 3px rgba(69, 209, 193, 0.2);
+    }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 50;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-6px);
+    }
+    .pass-overlay, .confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 8, 10, 0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 60;
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+    }
+    .pass-overlay.active, .confirm-overlay.active { display: flex; }
+    .pass-card, .confirm-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 24px 28px;
+      min-width: 280px;
+      box-shadow: var(--shadow);
+    }
+    .pass-card h2, .confirm-card h2 { margin: 0 0 8px; }
+    .pass-card p, .confirm-card p { margin: 0 0 12px; color: var(--muted); }
+    .fx-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 40;
+    }
+    .drag-ghost {
+      position: fixed;
+      width: 150px;
+      height: 216px;
+      border-radius: var(--card-radius);
+      background: var(--card);
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      box-shadow: 0 12px 22px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+      opacity: 0.9;
+      z-index: 45;
+      transition: transform 0.08s ease;
+    }
+    .damage-pop {
+      position: fixed;
+      font-weight: 800;
+      color: var(--danger);
+      animation: pop 0.8s ease forwards;
+      z-index: 44;
+      text-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+    }
+    @keyframes pop {
+      0% { transform: translateY(0) scale(1); opacity: 0; }
+      20% { opacity: 1; }
+      100% { transform: translateY(-30px) scale(1.2); opacity: 0; }
+    }
+    .impact {
+      position: fixed;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.4);
+      width: 60px;
+      height: 60px;
+      animation: impact 0.5s ease forwards;
+      z-index: 42;
+    }
+    @keyframes impact {
+      0% { transform: scale(0.2); opacity: 0.9; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+    .turn-banner {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: rgba(0, 0, 0, 0.7);
+      padding: 8px 18px;
+      border-radius: 999px;
+      font-weight: 700;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 55;
+    }
+    .turn-banner.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .zoom-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 8, 10, 0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 70;
+      padding: 20px;
+    }
+    .zoom-overlay.active { display: flex; }
+    .zoom-card {
+      transform: scale(2.2);
+      transform-origin: center;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      cursor: pointer;
+    }
+    .hamburger {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.35);
+      color: #fff;
+      font-size: 20px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 80;
+      cursor: pointer;
+    }
+    .mobile-menu {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 8, 10, 0.88);
+      display: none;
+      z-index: 85;
+      padding: 20px;
+    }
+    .mobile-menu.active { display: block; }
+    .mobile-menu .panel { max-width: 360px; margin: 0 auto; }
+    .mobile-menu .controls .btn { width: 100%; }
+    .sfx-pulse {
+      position: fixed;
+      inset: 0;
+      box-shadow: inset 0 0 0 0 rgba(255, 123, 58, 0.2);
+      animation: sfx 0.4s ease;
+      pointer-events: none;
+      z-index: 30;
+    }
+    @keyframes sfx {
+      0% { box-shadow: inset 0 0 0 0 rgba(255, 123, 58, 0.35); }
+      100% { box-shadow: inset 0 0 0 16px rgba(255, 123, 58, 0); }
+    }
+    .hidden-hand {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .shake {
+      animation: shake 0.3s ease;
+    }
+    @keyframes shake {
+      0% { transform: translateX(0); }
+      20% { transform: translateX(-4px); }
+      40% { transform: translateX(4px); }
+      60% { transform: translateX(-3px); }
+      80% { transform: translateX(3px); }
+      100% { transform: translateX(0); }
+    }
+    @media (max-width: 1100px) {
+      .table { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .hamburger { display: flex; }
+    }
+    @media (max-width: 768px) {
+      .table { padding: 10px; gap: 10px; }
+      .sidebar { order: 2; }
+      .play-area { order: 1; }
+      .player-top { flex-direction: column; align-items: flex-start; }
+      .player-face { width: 100%; }
+      .play-area { gap: 4px; }
+      .zone-stack { gap: 4px; }
+      .board-zone { min-height: 140px; }
+      .hand-zone {
+        min-height: 140px;
+        justify-content: center;
+        overflow: visible;
+      }
+      .card, .drag-ghost { width: 96px; height: 142px; }
+      .energy-bar { width: 40px; height: 150px; }
+      .end-turn-btn { padding: 6px 8px; font-size: 11px; }
+      .hand-row { gap: 6px; }
+      .controls { grid-template-columns: 1fr; }
+      .btn { width: 100%; }
+      .log { max-height: 140px; }
+      .meta-pill { font-size: 11px; }
+      .hand-zone .card { margin-left: calc(var(--hand-overlap, 36px) * -1); }
+    }
+    @media (max-width: 480px) {
+      .card, .drag-ghost { width: 84px; height: 124px; }
+      .energy-bar { width: 32px; height: 120px; }
+      .end-turn-btn { padding: 4px 6px; font-size: 10px; letter-spacing: -0.2px; }
+      .hand-row { gap: 4px; }
+      .hand-zone {
+        min-height: 130px;
+        justify-content: center;
+        overflow: visible;
+      }
+      .board-zone { min-height: 110px; }
+      .player-name { font-size: 16px; }
+      .player-meta { gap: 6px; }
+      .hand-zone .card { margin-left: calc(var(--hand-overlap, 36px) * -1); }
+      .play-area { gap: 4px; }
+      .zone-stack { gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="table">
+    <aside class="sidebar">
+      <div class="panel log-panel">
+        <div class="log-header">
+          <strong>Action Log</strong>
+          <button class="btn secondary" id="logToggleBtn">Toggle</button>
+        </div>
+        <div class="log" id="log"></div>
+      </div>
+    </aside>
+
+    <main class="play-area">
+      <section class="player-zone top" id="playerB">
+        <div class="zone-stack">
+          <div class="hand-wrapper">
+            <div class="zone-title">Hand</div>
+            <div class="hand-row">
+              <img class="energy-bar" id="playerBEnergyBar" alt="Energy bar" />
+              <div class="hand-zone" id="playerBHand"></div>
+              <button class="end-turn-btn" data-end-turn="true">End Turn</button>
+            </div>
+          </div>
+          <div class="board-wrapper">
+            <div class="board-zone" id="playerBBoard" data-target-kind="board" data-player-id="B"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="player-zone bottom" id="playerA">
+        <div class="zone-stack">
+          <div class="board-wrapper">
+            <div class="board-zone" id="playerABoard" data-target-kind="board" data-player-id="A"></div>
+          </div>
+          <div class="hand-wrapper">
+            <div class="zone-title">Hand</div>
+            <div class="hand-row">
+              <img class="energy-bar" id="playerAEnergyBar" alt="Energy bar" />
+              <div class="hand-zone" id="playerAHand"></div>
+              <button class="end-turn-btn" data-end-turn="true">End Turn</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="center-hp">
+        <div class="hp-pill" id="centerHpB" data-target-kind="player" data-player-id="B">Big Smash: 20</div>
+        <div class="hp-pill" id="centerHpA" data-target-kind="player" data-player-id="A">Aggro: 20</div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="pass-overlay" id="passOverlay">
+    <div class="pass-card">
+      <h2 id="passTitle">Pass to Player</h2>
+      <p>Tap to continue</p>
+      <button class="btn" id="passContinue">Continue</button>
+    </div>
+  </div>
+  <div class="confirm-overlay" id="confirmOverlay">
+    <div class="confirm-card">
+      <h2>Confirm action</h2>
+      <p id="confirmText">Are you sure?</p>
+      <div style="display:flex; gap:10px; justify-content:center;">
+        <button class="btn" id="confirmYes">Confirm</button>
+        <button class="btn secondary" id="confirmNo">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <div class="turn-banner" id="turnBanner"></div>
+  <button class="hamburger" id="hamburgerBtn">☰</button>
+  <div class="mobile-menu" id="mobileMenu">
+    <div class="panel">
+      <div class="controls">
+        <button class="btn" id="newGameBtn">New Game (N)</button>
+      </div>
+      <div class="hint-bar" id="hintBarMobile">Drag a card to play. Drag a unit to attack.</div>
+      <div class="toggle"><span>Show action log</span><input type="checkbox" id="logToggleMobile" /></div>
+      <div class="toggle"><span>Hotseat privacy</span><input type="checkbox" id="privacyToggleMobile" checked /></div>
+      <div class="toggle"><span>Confirm dangerous actions</span><input type="checkbox" id="confirmToggleMobile" /></div>
+      <div class="toggle"><span>SFX pulse</span><input type="checkbox" id="sfxToggleMobile" checked /></div>
+      <div class="panel how-to" style="margin-top:12px;">
+        <strong>How to play</strong><br />
+        Drag cards to play. Drag units onto targets to attack. End Turn to pass control. If hotseat privacy is on, pass overlay hides both hands.
+      </div>
+    </div>
+  </div>
+  <div class="zoom-overlay" id="zoomOverlay">
+    <div class="zoom-card" id="zoomCard"></div>
+  </div>
+  <div class="fx-layer" id="fxLayer"></div>
+
+  <script>
+    const CARD_DB = {
+      "Street Rusher": { type: "unit", cost: 1, attack: 2, health: 1, keywords: ["Rush"], text: "Rush" },
+      "Knife Pup": { type: "unit", cost: 1, attack: 1, health: 1, keywords: ["Rush"], text: "Rush. When this attacks player, deal +1 damage." },
+      "Bloodblade Raider": { type: "unit", cost: 2, attack: 3, health: 1, keywords: ["Rush"], text: "Rush" },
+      "Alley Brawler": { type: "unit", cost: 2, attack: 2, health: 2, keywords: [], text: "" },
+      "Flame Hound": { type: "unit", cost: 3, attack: 3, health: 2, keywords: ["Rush"], text: "Rush" },
+      "Gore Captain": { type: "unit", cost: 4, attack: 4, health: 3, keywords: ["Rush"], text: "Rush" },
+      "Spark": { type: "spell", cost: 1, text: "Deal 1 damage to any target.", target: "any", effect: { kind: "damage", amount: 1 } },
+      "Quick Shot": { type: "spell", cost: 2, text: "Deal 2 damage to any target.", target: "any", effect: { kind: "damage", amount: 2 } },
+      "All-Out Assault": { type: "spell", cost: 3, text: "Your units get +1 Attack this turn.", target: "none", effect: { kind: "buff", attack: 1 } },
+      "Stone Wall": { type: "unit", cost: 2, attack: 0, health: 4, keywords: ["Guard"], text: "Guard" },
+      "Iron Guard": { type: "unit", cost: 4, attack: 2, health: 5, keywords: ["Guard"], text: "Guard" },
+      "Bonecrusher": { type: "unit", cost: 3, attack: 4, health: 3, keywords: [], text: "" },
+      "Siege Brute": { type: "unit", cost: 4, attack: 5, health: 5, keywords: [], text: "" },
+      "Worldbreaker Titan": { type: "unit", cost: 5, attack: 8, health: 8, keywords: [], text: "When this attacks player, deal 4 damage." },
+      "Bastion Sentinel": { type: "unit", cost: 3, attack: 3, health: 4, keywords: ["Guard"], text: "Guard" },
+      "Chip Shot": { type: "spell", cost: 1, text: "Deal 1 damage to a unit.", target: "unit", effect: { kind: "damage", amount: 1 } },
+      "Crush Small": { type: "spell", cost: 2, text: "Destroy unit with Health <= 2.", target: "unit", effect: { kind: "destroy_if", maxHealth: 2 } },
+      "Reinforce": { type: "spell", cost: 3, text: "Heal 4 health.", target: "none", effect: { kind: "heal", amount: 4 } },
+      "Heavy Slam": { type: "spell", cost: 3, text: "Destroy unit with Health <= 3.", target: "unit", effect: { kind: "destroy_if", maxHealth: 3 } },
+      "Obliterate": { type: "spell", cost: 4, text: "Destroy any unit; you lose 2 health.", target: "unit", effect: { kind: "destroy_any", selfDamage: 2 } },
+      "Shockwave": { type: "spell", cost: 4, text: "Deal 2 damage to ALL units.", target: "none", effect: { kind: "aoe_damage", amount: 2 } }
+    };
+
+    const DECKS = {
+      A: [
+        ...Array(3).fill("Street Rusher"),
+        ...Array(2).fill("Knife Pup"),
+        ...Array(3).fill("Bloodblade Raider"),
+        ...Array(2).fill("Alley Brawler"),
+        ...Array(2).fill("Flame Hound"),
+        ...Array(1).fill("Gore Captain"),
+        ...Array(3).fill("Spark"),
+        ...Array(2).fill("Quick Shot"),
+        ...Array(2).fill("All-Out Assault")
+      ],
+      B: [
+        ...Array(3).fill("Stone Wall"),
+        ...Array(2).fill("Iron Guard"),
+        ...Array(1).fill("Bonecrusher"),
+        ...Array(1).fill("Siege Brute"),
+        ...Array(2).fill("Worldbreaker Titan"),
+        ...Array(3).fill("Chip Shot"),
+        ...Array(2).fill("Crush Small"),
+        ...Array(2).fill("Reinforce"),
+        ...Array(1).fill("Heavy Slam"),
+        ...Array(1).fill("Obliterate"),
+        ...Array(1).fill("Shockwave"),
+        ...Array(1).fill("Bastion Sentinel")
+      ]
+    };
+
+    const state = {
+      players: [],
+      activePlayer: 0,
+      turn: 1,
+      nextUnitId: 1,
+      nextCardId: 1,
+      attackMode: true,
+      targeting: null,
+      gameOver: false,
+      log: [],
+      logCollapsed: true,
+      showLog: false,
+      drag: null,
+      suppressClickUntil: 0,
+      passOverlay: { active: false, nextPlayer: 0 },
+      confirm: null,
+      settings: {
+        privacy: true,
+        confirmDangerous: false,
+        sfxPulse: true
+      }
+    };
+
+    function log(message, isError = false) {
+      const entry = { message, isError };
+      state.log.push(entry);
+      renderLog();
+    }
+
+    function toast(message, isError = false) {
+      const toastEl = document.getElementById("toast");
+      toastEl.textContent = message;
+      toastEl.style.background = isError ? "rgba(190, 40, 40, 0.9)" : "rgba(0, 0, 0, 0.8)";
+      toastEl.classList.add("show");
+      clearTimeout(toastEl._timer);
+      toastEl._timer = setTimeout(() => toastEl.classList.remove("show"), 1600);
+    }
+
+    function sfxPulse() {
+      if (!state.settings.sfxPulse) return;
+      const fx = document.createElement("div");
+      fx.className = "sfx-pulse";
+      document.body.appendChild(fx);
+      setTimeout(() => fx.remove(), 400);
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function buildDeck(deckList) {
+      return shuffle(deckList.map(name => ({ id: state.nextCardId++, name })));
+    }
+
+    function getArtPath(name, playerId) {
+      const folder = playerId === "A" ? "aggro" : "big-smash";
+      return `cards/${folder}/${encodeURIComponent(name)}.png`;
+    }
+
+    function applyCardArt(cardEl, name, playerId) {
+      const img = document.createElement("img");
+      img.className = "card-art";
+      img.src = getArtPath(name, playerId);
+      img.onload = () => cardEl.classList.add("arted");
+      img.onerror = () => img.remove();
+      cardEl.prepend(img);
+    }
+
+    function chooseStartingPlayer() {
+      const answer = prompt("Who starts? Enter A (Aggro) or B (Big Smash).", "A");
+      if (!answer) return 0;
+      const normalized = answer.trim().toLowerCase();
+      if (normalized === "b" || normalized.includes("big")) return 1;
+      return 0;
+    }
+
+    function newGame() {
+      state.players = [
+        createPlayer("Aggro", "A"),
+        createPlayer("Big Smash", "B")
+      ];
+      state.activePlayer = chooseStartingPlayer();
+      state.turn = 1;
+      state.nextUnitId = 1;
+      state.nextCardId = 1;
+      state.attackMode = true;
+      state.targeting = null;
+      state.gameOver = false;
+      state.log = [];
+      state.showLog = false;
+      state.passOverlay = { active: false, nextPlayer: 0 };
+      state.players.forEach(player => {
+        player.deck = buildDeck(DECKS[player.id]);
+        player.hand = [];
+        player.board = [];
+        player.discard = [];
+        player.health = 20;
+        player.maxEnergy = 0;
+        player.energy = 0;
+        player.tempAttackBuff = 0;
+        drawCards(player, 5, true);
+      });
+      startTurn();
+      log("New game started.");
+      render();
+    }
+
+    function createPlayer(name, id) {
+      return {
+        name,
+        id,
+        health: 20,
+        maxEnergy: 0,
+        energy: 0,
+        deck: [],
+        hand: [],
+        board: [],
+        discard: [],
+        tempAttackBuff: 0
+      };
+    }
+
+    function active() { return state.players[state.activePlayer]; }
+    function opponent() { return state.players[1 - state.activePlayer]; }
+
+    function drawCards(player, count, skipFx = false) {
+      for (let i = 0; i < count; i++) {
+        if (player.deck.length === 0) {
+          endGame(`${player.name} tried to draw from an empty deck and loses!`);
+          return;
+        }
+        player.hand.push(player.deck.pop());
+        if (!skipFx) animateDraw(player.id);
+      }
+    }
+
+    function startTurn() {
+      if (state.gameOver) return;
+      const player = active();
+      player.maxEnergy = Math.min(5, player.maxEnergy + 1);
+      player.energy = player.maxEnergy;
+      player.tempAttackBuff = 0;
+      player.board.forEach(unit => {
+        unit.hasAttacked = false;
+        unit.summoningSick = false;
+      });
+      drawCards(player, 1);
+      log(`${player.name} starts turn ${state.turn}. Energy ${player.energy}/${player.maxEnergy}. Drew 1 card.`);
+      showTurnBanner(`${player.name} Turn`);
+      render();
+    }
+
+    function endTurn() {
+      if (state.gameOver) return;
+      clearTargeting();
+      state.attackMode = true;
+      active().tempAttackBuff = 0;
+      const nextPlayer = 1 - state.activePlayer;
+      if (state.settings.privacy) {
+        state.passOverlay = { active: true, nextPlayer };
+        render();
+      } else {
+        finalizeTurnSwitch(nextPlayer);
+      }
+    }
+
+    function finalizeTurnSwitch(nextPlayer) {
+      state.activePlayer = nextPlayer;
+      state.turn += 1;
+      state.passOverlay = { active: false, nextPlayer: 0 };
+      startTurn();
+      render();
+    }
+
+    function endGame(message) {
+      state.gameOver = true;
+      log(message);
+      log("Game over.");
+    }
+
+    function canPlayCard(player, card) {
+      const def = CARD_DB[card.name];
+      if (!def) return { ok: false, reason: "Unknown card." };
+      if (player.energy < def.cost) return { ok: false, reason: "Not enough energy." };
+      return { ok: true };
+    }
+
+    function playCard(cardId) {
+      if (state.gameOver) return;
+      const player = active();
+      const cardIndex = player.hand.findIndex(c => c.id === cardId);
+      if (cardIndex === -1) return;
+      const card = player.hand[cardIndex];
+      const def = CARD_DB[card.name];
+      if (state.targeting) { log("Finish current targeting first.", true); return; }
+      const legality = canPlayCard(player, card);
+      if (!legality.ok) { log(legality.reason, true); toast(legality.reason, true); return; }
+
+      const startRect = getCardRect(cardId, player.id);
+
+      if (def.type === "unit") {
+        player.energy -= def.cost;
+        player.hand.splice(cardIndex, 1);
+        const unit = {
+          id: state.nextUnitId++,
+          name: card.name,
+          owner: player.id,
+          attack: def.attack,
+          health: def.health,
+          maxHealth: def.health,
+          keywords: def.keywords.slice(),
+          summoningSick: !def.keywords.includes("Rush"),
+          hasAttacked: false
+        };
+        player.board.push(unit);
+        log(`${player.name} played ${card.name}.`);
+        sfxPulse();
+        animatePlay(startRect, getBoardRect(player.id));
+      } else {
+        if (def.target === "none") {
+          const castNow = () => {
+            player.energy -= def.cost;
+            player.hand.splice(cardIndex, 1);
+            resolveSpell(player, card.name, null);
+            player.discard.push(card.name);
+            sfxPulse();
+            animatePlay(startRect, getBoardRect(player.id));
+          };
+          if (state.settings.confirmDangerous && def.effect && def.effect.kind === "aoe_damage") {
+            confirmAction("Confirm Shockwave?", castNow);
+          } else {
+            castNow();
+          }
+        } else {
+          player.energy -= def.cost;
+          player.hand.splice(cardIndex, 1);
+          const targets = getValidSpellTargets(player, def);
+          if (targets.length === 0) {
+            log("No valid targets.", true);
+            toast("No valid targets.", true);
+            player.energy += def.cost;
+            player.hand.splice(cardIndex, 0, card);
+            return;
+          }
+          state.targeting = { mode: "spell", playerId: player.id, cardName: card.name, targets };
+          log(`Select target for ${card.name}.`);
+        }
+      }
+      render();
+    }
+
+    function playCardWithTarget(cardId, target) {
+      if (state.gameOver) return;
+      const player = active();
+      const cardIndex = player.hand.findIndex(c => c.id === cardId);
+      if (cardIndex === -1) return;
+      const card = player.hand[cardIndex];
+      const def = CARD_DB[card.name];
+      if (def.type === "unit") return;
+      const legality = canPlayCard(player, card);
+      if (!legality.ok) { log(legality.reason, true); toast(legality.reason, true); return; }
+      const targets = getValidSpellTargets(player, def);
+      const isValid = targets.some(t => t.kind === target.kind && t.playerId === target.playerId && t.unitId === target.unitId);
+      if (!isValid) { log("Invalid target.", true); toast("Invalid target.", true); return; }
+
+      const startRect = getCardRect(cardId, player.id);
+      player.energy -= def.cost;
+      player.hand.splice(cardIndex, 1);
+      resolveSpell(player, card.name, target);
+      player.discard.push(card.name);
+      sfxPulse();
+      animatePlay(startRect, getTargetRect(target));
+      render();
+    }
+
+    function getValidSpellTargets(player, def) {
+      const enemy = player.id === "A" ? state.players[1] : state.players[0];
+      let targets = [];
+      if (def.target === "any") {
+        targets.push({ kind: "player", playerId: enemy.id });
+        targets.push({ kind: "player", playerId: player.id });
+        enemy.board.forEach(u => targets.push({ kind: "unit", playerId: enemy.id, unitId: u.id }));
+        player.board.forEach(u => targets.push({ kind: "unit", playerId: player.id, unitId: u.id }));
+      }
+      if (def.target === "unit") {
+        const isDestroyIf = def.effect && def.effect.kind === "destroy_if";
+        const maxHealth = isDestroyIf ? def.effect.maxHealth : Infinity;
+        enemy.board.forEach(u => { if (u.health <= maxHealth) targets.push({ kind: "unit", playerId: enemy.id, unitId: u.id }); });
+        player.board.forEach(u => { if (u.health <= maxHealth) targets.push({ kind: "unit", playerId: player.id, unitId: u.id }); });
+      }
+      return targets;
+    }
+
+    function resolveSpell(player, cardName, target) {
+      const def = CARD_DB[cardName];
+      if (def.effect.kind === "damage") {
+        applyDamage(target, def.effect.amount, `${cardName} deals ${def.effect.amount} damage`);
+      } else if (def.effect.kind === "heal") {
+        player.health = Math.min(20, player.health + def.effect.amount);
+        log(`${player.name} heals ${def.effect.amount}.`);
+        sfxPulse();
+      } else if (def.effect.kind === "buff") {
+        player.tempAttackBuff += def.effect.attack;
+        log(`${player.name}'s units get +${def.effect.attack} attack this turn.`);
+        sfxPulse();
+      } else if (def.effect.kind === "aoe_damage") {
+        const allUnits = [...state.players[0].board, ...state.players[1].board];
+        allUnits.forEach(unit => { unit.health -= def.effect.amount; });
+        log(`${cardName} deals ${def.effect.amount} damage to all units.`);
+        sfxPulse();
+        flashBoard();
+        const dead = allUnits.filter(unit => unit.health <= 0);
+        dead.forEach(unit => {
+          spawnDeathFx(unit);
+          destroyUnit(unit);
+          log(`${unit.name} dies.`);
+        });
+      } else if (def.effect.kind === "destroy_if") {
+        if (!target || target.kind !== "unit") { log("Invalid target.", true); return; }
+        const unit = findUnit(target.playerId, target.unitId);
+        if (!unit) { log("Target missing.", true); return; }
+        if (unit.health <= def.effect.maxHealth) {
+          spawnDeathFx(unit);
+          destroyUnit(unit);
+          log(`${cardName} destroys ${unit.name}.`);
+        } else {
+          log(`${cardName} fails; target health too high.`, true);
+          toast("Target too tough.", true);
+        }
+      } else if (def.effect.kind === "destroy_any") {
+        if (!target || target.kind !== "unit") { log("Invalid target.", true); return; }
+        const unit = findUnit(target.playerId, target.unitId);
+        if (!unit) { log("Target missing.", true); return; }
+        spawnDeathFx(unit);
+        destroyUnit(unit);
+        player.health -= def.effect.selfDamage;
+        log(`${cardName} destroys ${unit.name}. ${player.name} loses ${def.effect.selfDamage} health.`);
+        checkDeaths();
+      }
+      render();
+    }
+    function findUnit(playerId, unitId) {
+      const owner = state.players.find(p => p.id === playerId);
+      if (!owner) return null;
+      return owner.board.find(u => u.id === unitId);
+    }
+
+    function destroyUnit(unit) {
+      const owner = state.players.find(p => p.id === unit.owner);
+      if (!owner) return;
+      owner.board = owner.board.filter(u => u.id !== unit.id);
+      owner.discard.push(unit.name);
+    }
+
+    function applyDamage(target, amount, sourceText) {
+      if (!target) return;
+      if (target.kind === "player") {
+        const p = state.players.find(pl => pl.id === target.playerId);
+        p.health -= amount;
+        log(`${sourceText} to ${p.name}.`);
+        spawnDamage(target, amount);
+        flashTarget(target);
+      } else {
+        const unit = findUnit(target.playerId, target.unitId);
+        if (!unit) return;
+        unit.health -= amount;
+        log(`${sourceText} to ${unit.name}.`);
+        spawnDamage(target, amount);
+        flashTarget(target);
+        if (unit.health <= 0) {
+          spawnDeathFx(unit);
+          destroyUnit(unit);
+          log(`${unit.name} dies.`);
+        }
+      }
+      checkDeaths();
+    }
+
+    function checkDeaths() {
+      state.players.forEach(player => {
+        if (player.health <= 0) {
+          endGame(`${player.name} is at 0 health and loses!`);
+        }
+      });
+    }
+
+    function getAttackTargets(attacker) {
+      const player = active();
+      if (attacker.owner !== player.id) return { ok: false, reason: "You can only attack with your own units." };
+      if (attacker.summoningSick && !attacker.keywords.includes("Rush")) return { ok: false, reason: "Summoning sickness prevents attack." };
+      if (attacker.hasAttacked) return { ok: false, reason: "Unit already attacked this turn." };
+      const enemy = opponent();
+      const guards = enemy.board.filter(u => u.keywords.includes("Guard"));
+      let targets = [];
+      if (guards.length > 0) {
+        targets = guards.map(u => ({ kind: "unit", playerId: enemy.id, unitId: u.id }));
+      } else {
+        targets = [
+          { kind: "player", playerId: enemy.id },
+          ...enemy.board.map(u => ({ kind: "unit", playerId: enemy.id, unitId: u.id }))
+        ];
+      }
+      return { ok: true, targets };
+    }
+
+    function resolveAttack(attacker, target) {
+      const enemy = opponent();
+      const attackerOwner = active();
+      if (!target) return;
+
+      const attackBonus = attackerOwner.tempAttackBuff || 0;
+      const attackValue = attacker.attack + attackBonus;
+
+      if (target.kind === "player") {
+        enemy.health -= attackValue;
+        if (attacker.name === "Knife Pup") {
+          enemy.health -= 1;
+          log("Knife Pup triggers for +1 damage.");
+        }
+        if (attacker.name === "Worldbreaker Titan") {
+          enemy.health -= 4;
+          log("Worldbreaker Titan triggers for +4 damage.");
+        }
+        log(`${attacker.name} hits ${enemy.name} for ${attackValue} damage.`);
+        spawnDamage(target, attackValue);
+        flashTarget(target);
+        checkDeaths();
+      } else {
+        const defender = findUnit(target.playerId, target.unitId);
+        if (!defender) return;
+        defender.health -= attackValue;
+        attacker.health -= defender.attack;
+        log(`${attacker.name} (${attackValue}) attacks ${defender.name} (${defender.attack}).`);
+        spawnDamage(target, attackValue);
+        spawnDamage({ kind: "unit", playerId: attacker.owner, unitId: attacker.id }, defender.attack);
+        flashTarget(target);
+        if (defender.health <= 0) {
+          spawnDeathFx(defender);
+          destroyUnit(defender);
+          log(`${defender.name} dies.`);
+        }
+        if (attacker.health <= 0) {
+          spawnDeathFx(attacker);
+          destroyUnit(attacker);
+          log(`${attacker.name} dies.`);
+        }
+      }
+      attacker.hasAttacked = true;
+      attacker.summoningSick = false;
+      sfxPulse();
+      clearTargeting();
+      checkDeaths();
+      render();
+    }
+
+    function clearTargeting() {
+      state.targeting = null;
+    }
+
+    function renderLog() {
+      const logEl = document.getElementById("log");
+      logEl.innerHTML = "";
+      const entries = state.logCollapsed ? state.log.slice(-10) : state.log;
+      logEl.classList.toggle("collapsed", state.logCollapsed);
+      entries.forEach(entry => {
+        const line = document.createElement("div");
+        if (entry.isError) line.classList.add("error");
+        line.textContent = entry.message;
+        logEl.appendChild(line);
+      });
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function renderPlayer(player, isActive) {
+      const meta = document.getElementById(player.id === "A" ? "playerAMeta" : "playerBMeta");
+      const energyBarEl = document.getElementById(player.id === "A" ? "playerAEnergyBar" : "playerBEnergyBar");
+      const centerHpEl = document.getElementById(player.id === "A" ? "centerHpA" : "centerHpB");
+      if (meta) {
+        meta.innerHTML = "";
+        meta.appendChild(metaPill(`Deck ${player.deck.length}`));
+        meta.appendChild(metaPill(`Discard ${player.discard.length}`));
+        meta.appendChild(metaPill(`Hand ${player.hand.length}`));
+        meta.appendChild(metaPill(isActive ? "Active" : "Waiting"));
+      }
+      if (energyBarEl) {
+        const energyValue = Math.max(0, Math.min(5, player.energy));
+        energyBarEl.src = `images/energy/${energyValue} energy.png`;
+        energyBarEl.alt = `Energy ${player.energy}/${player.maxEnergy}`;
+      }
+      if (centerHpEl) {
+        centerHpEl.textContent = `${player.name}: ${player.health}`;
+      }
+    }
+
+    function metaPill(text) {
+      const div = document.createElement("div");
+      div.className = "meta-pill";
+      div.textContent = text;
+      return div;
+    }
+
+    function renderZone(player, zoneId, list, type) {
+      const container = document.getElementById(zoneId);
+      container.innerHTML = "";
+      list.forEach(item => {
+        const def = CARD_DB[item.name];
+        const card = document.createElement("div");
+        card.className = `card ${def.type}`;
+        card.dataset.cardId = item.id;
+        card.dataset.playerId = player.id;
+        card.dataset.zone = "board";
+        card.dataset.targetKind = "unit";
+        if (type === "unit") card.dataset.unitId = item.id;
+        if (type === "unit") {
+          const attackBonus = player.tempAttackBuff || 0;
+          const displayAttack = item.attack + attackBonus;
+          card.innerHTML = `
+            <div class="cost">${def.cost}</div>
+            <div class="card-content">
+              <div class="name">${item.name}</div>
+              <div class="type-line">Unit</div>
+              <div class="rules">${def.text}</div>
+              <div class="stats">
+                <span class="pip">A ${displayAttack}</span>
+                <span class="pip">H ${item.health}</span>
+              </div>
+            </div>
+          `;
+          addKeywords(card, item);
+        } else {
+          card.innerHTML = `
+            <div class="cost">${def.cost}</div>
+            <div class="card-content">
+              <div class="name">${item.name}</div>
+              <div class="type-line">Spell</div>
+              <div class="rules">${def.text}</div>
+              <div class="stats"><span class="pip">Spell</span></div>
+            </div>
+          `;
+        }
+        applyCardArt(card, item.name, player.id);
+        if (state.targeting && isTargetable({ kind: "unit", playerId: player.id, unitId: item.id })) {
+          card.classList.add("drop-target");
+        }
+        container.appendChild(card);
+      });
+    }
+
+    function addKeywords(card, item) {
+      const def = CARD_DB[item.name];
+      const wrap = document.createElement("div");
+      def.keywords.forEach(keyword => {
+        const chip = document.createElement("span");
+        chip.className = `keyword ${keyword.toLowerCase()}`;
+        chip.textContent = keyword;
+        wrap.appendChild(chip);
+      });
+      if (item.summoningSick) {
+        const chip = document.createElement("span");
+        chip.className = "keyword sick";
+        chip.textContent = "Sick";
+        wrap.appendChild(chip);
+      }
+      if (wrap.childNodes.length > 0) {
+        const content = card.querySelector(".card-content");
+        const stats = content ? content.querySelector(".stats") : card.querySelector(".stats");
+        if (content && stats) {
+          content.insertBefore(wrap, stats);
+        } else if (stats) {
+          card.insertBefore(wrap, stats);
+        } else {
+          card.appendChild(wrap);
+        }
+      }
+    }
+
+    function renderHand(player, zoneId) {
+      const container = document.getElementById(zoneId);
+      container.innerHTML = "";
+      const isActivePlayer = active().id === player.id;
+      const hideHand = state.passOverlay.active || (state.settings.privacy && !isActivePlayer);
+      if (hideHand) {
+        const hidden = document.createElement("div");
+        hidden.className = "hidden-hand";
+        hidden.textContent = `Hand hidden (${player.hand.length})`;
+        container.appendChild(hidden);
+        for (let i = 0; i < player.hand.length; i++) {
+          const back = document.createElement("div");
+          back.className = "card back";
+          container.appendChild(back);
+        }
+        return;
+      }
+      const total = player.hand.length;
+      player.hand.forEach((card, index) => {
+        const def = CARD_DB[card.name];
+        const div = document.createElement("div");
+        div.className = `card ${def.type} hand-card`;
+        div.dataset.cardId = card.id;
+        div.dataset.playerId = player.id;
+        div.dataset.zone = "hand";
+        const tilt = total > 1 ? ((index / (total - 1)) - 0.5) * 1.1 : 0;
+        div.style.setProperty("--tilt-angle", `${tilt * 10}deg`);
+        div.style.setProperty("--tilt-offset", `${Math.abs(tilt) * 6}px`);
+        div.setAttribute("data-tilt", "true");
+        const statsLine = def.type === "unit"
+          ? `<div class="stats"><span class="pip">A ${def.attack}</span><span class="pip">H ${def.health}</span></div>`
+          : `<div class="stats"><span class="pip">Spell</span></div>`;
+        div.innerHTML = `
+          <div class="cost">${def.cost}</div>
+          <div class="card-content">
+            <div class="name">${card.name}</div>
+            <div class="type-line">${def.type.toUpperCase()}</div>
+            <div class="rules">${def.text}</div>
+            ${statsLine}
+          </div>
+        `;
+        applyCardArt(div, card.name, player.id);
+        container.appendChild(div);
+      });
+      updateHandOverlap(container);
+    }
+
+    function updateHandOverlap(container) {
+      const cards = Array.from(container.querySelectorAll(".card"));
+      if (cards.length <= 1) {
+        container.style.setProperty("--hand-overlap", "0px");
+        return;
+      }
+      requestAnimationFrame(() => {
+        const cardWidth = cards[0].getBoundingClientRect().width || 140;
+        const containerWidth = container.getBoundingClientRect().width || 0;
+        if (containerWidth === 0) return;
+        const maxOverlap = Math.min(cardWidth * 0.85, cardWidth - 6);
+        const minOverlap = Math.max(cardWidth * 0.25, 10);
+        const allowed = containerWidth - cardWidth;
+        const neededOverlap = cardWidth - (allowed / (cards.length - 1));
+        const overlap = Math.min(maxOverlap, Math.max(minOverlap, neededOverlap));
+        container.style.setProperty("--hand-overlap", `${overlap}px`);
+      });
+    }
+
+    function isTargetable(target) {
+      if (!state.targeting) return false;
+      return state.targeting.targets.some(t => t.kind === target.kind && t.playerId === target.playerId && t.unitId === target.unitId);
+    }
+
+    function render() {
+      renderPlayer(state.players[1], state.activePlayer === 1);
+      renderPlayer(state.players[0], state.activePlayer === 0);
+      renderZone(state.players[1], "playerBBoard", state.players[1].board, "unit");
+      renderZone(state.players[0], "playerABoard", state.players[0].board, "unit");
+      renderHand(state.players[1], "playerBHand");
+      renderHand(state.players[0], "playerAHand");
+      const logPanel = document.querySelector(".log-panel");
+      if (logPanel) logPanel.classList.toggle("hidden", !state.showLog);
+      document.getElementById("passOverlay").classList.toggle("active", state.passOverlay.active);
+      document.getElementById("passTitle").textContent = state.passOverlay.active
+        ? `Pass to ${state.players[state.passOverlay.nextPlayer].name}`
+        : "";
+      document.getElementById("confirmOverlay").classList.toggle("active", !!state.confirm);
+      renderLog();
+    }
+    function handleTargetClick(target) {
+      if (!state.targeting) return;
+      const t = state.targeting;
+      const isValid = t.targets.some(v => v.kind === target.kind && v.playerId === target.playerId && v.unitId === target.unitId);
+      if (!isValid) { log("Invalid target.", true); toast("Invalid target.", true); return; }
+
+      if (t.mode === "spell") {
+        const player = state.players.find(p => p.id === t.playerId);
+        resolveSpell(player, t.cardName, target);
+        player.discard.push(t.cardName);
+      }
+      if (t.mode === "attack") {
+        const attacker = findUnit(t.playerId, t.attackerId);
+        if (!attacker) { log("Attacker missing.", true); return; }
+        resolveAttack(attacker, target);
+      }
+      clearTargeting();
+      render();
+    }
+
+    function handlePointerDown(event) {
+      if (state.passOverlay.active || state.gameOver) return;
+      const card = event.target.closest(".card");
+      if (!card || card.classList.contains("back")) return;
+      if (event.pointerType === "touch") event.preventDefault();
+      state.suppressClickUntil = Date.now() + 500;
+      if (card.setPointerCapture) {
+        try { card.setPointerCapture(event.pointerId); } catch (err) {}
+      }
+      const zone = card.dataset.zone;
+      if (zone === "hand") {
+        document.querySelectorAll(".hand-zone .card.touch-active").forEach(el => el.classList.remove("touch-active"));
+        card.classList.add("touch-active");
+      }
+      if (zone === "hand") {
+        startDragFromHand(card, event);
+      } else if (zone === "board") {
+        startDragFromBoard(card, event);
+      }
+    }
+
+    function startDragFromHand(cardEl, event) {
+      const playerId = cardEl.dataset.playerId;
+      const player = state.players.find(p => p.id === playerId);
+      if (!player || active().id !== playerId) return;
+      const cardId = Number(cardEl.dataset.cardId);
+      const card = player.hand.find(c => c.id === cardId);
+      if (!card) return;
+      const def = CARD_DB[card.name];
+      const legality = canPlayCard(player, card);
+      if (!legality.ok) { toast(legality.reason, true); cardEl.classList.add("shake"); setTimeout(() => cardEl.classList.remove("shake"), 300); return; }
+
+      const targets = def.type === "unit" || def.target === "none"
+        ? [{ kind: "board", playerId: player.id }]
+        : getValidSpellTargets(player, def);
+      if (def.type === "spell" && def.target !== "none" && targets.length === 0) {
+        toast("No valid targets.", true);
+        return;
+      }
+
+      state.drag = {
+        mode: def.type === "unit" ? "play-unit" : (def.target === "none" ? "play-spell" : "play-spell-target"),
+        cardId,
+        playerId,
+        targets,
+        ghost: createGhost(cardEl, event)
+      };
+      highlightTargets(targets);
+      event.preventDefault();
+    }
+
+    function startDragFromBoard(cardEl, event) {
+      if (!state.attackMode) { toast("Attack mode is off.", true); return; }
+      const playerId = cardEl.dataset.playerId;
+      if (active().id !== playerId) { toast("Not your unit.", true); return; }
+      const unitId = Number(cardEl.dataset.unitId);
+      const unit = findUnit(playerId, unitId);
+      if (!unit) return;
+      const attackInfo = getAttackTargets(unit);
+      if (!attackInfo.ok) { toast(attackInfo.reason, true); cardEl.classList.add("shake"); setTimeout(() => cardEl.classList.remove("shake"), 300); return; }
+      state.drag = {
+        mode: "attack",
+        attackerId: unitId,
+        playerId,
+        targets: attackInfo.targets,
+        ghost: createGhost(cardEl, event)
+      };
+      highlightTargets(attackInfo.targets);
+      event.preventDefault();
+    }
+
+    function handlePointerMove(event) {
+      if (!state.drag) return;
+      moveGhost(state.drag.ghost, event.clientX, event.clientY);
+    }
+
+    function handlePointerUp(event) {
+      if (!state.drag) return;
+      const card = event.target.closest(".card");
+      if (card && card.releasePointerCapture) {
+        try { card.releasePointerCapture(event.pointerId); } catch (err) {}
+      }
+      const drag = state.drag;
+      const targetEl = document.elementFromPoint(event.clientX, event.clientY);
+      const dropTarget = findTargetFromElement(targetEl);
+      clearHighlights();
+      if (!dropTarget || !isTargetValid(dropTarget, drag.targets)) {
+        snapBack(drag.ghost, event.clientX, event.clientY);
+        toast("Illegal action.", true);
+        state.drag = null;
+        return;
+      }
+
+      if (drag.mode === "play-unit" || drag.mode === "play-spell") {
+        if (dropTarget.kind === "board" && dropTarget.playerId === drag.playerId) {
+          playCard(drag.cardId);
+        }
+      } else if (drag.mode === "play-spell-target") {
+        playCardWithTarget(drag.cardId, dropTarget);
+      } else if (drag.mode === "attack") {
+        const doAttack = () => {
+          const attacker = findUnit(drag.playerId, drag.attackerId);
+          if (!attacker) return;
+          animateAttack(attacker, dropTarget);
+          resolveAttack(attacker, dropTarget);
+        };
+        if (state.settings.confirmDangerous) {
+          confirmAction("Confirm attack?", doAttack);
+        } else {
+          doAttack();
+        }
+      }
+      removeGhost(drag.ghost);
+      state.drag = null;
+    }
+
+    function confirmAction(text, onConfirm) {
+      state.confirm = { text, onConfirm };
+      document.getElementById("confirmText").textContent = text;
+      render();
+    }
+
+    function resolveConfirm(accepted) {
+      if (!state.confirm) return;
+      const confirm = state.confirm;
+      state.confirm = null;
+      render();
+      if (accepted) confirm.onConfirm();
+    }
+
+    function isTargetValid(target, list) {
+      return list.some(t => t.kind === target.kind && t.playerId === target.playerId && t.unitId === target.unitId);
+    }
+
+    function findTargetFromElement(el) {
+      if (!el) return null;
+      const target = el.closest("[data-target-kind]");
+      if (!target) return null;
+      const kind = target.dataset.targetKind;
+      if (kind === "player") {
+        return { kind: "player", playerId: target.dataset.playerId };
+      }
+      if (kind === "unit") {
+        return { kind: "unit", playerId: target.dataset.playerId, unitId: Number(target.dataset.unitId) };
+      }
+      if (kind === "board") {
+        return { kind: "board", playerId: target.dataset.playerId };
+      }
+      return null;
+    }
+
+    function highlightTargets(targets) {
+      targets.forEach(target => {
+        const el = getTargetElement(target);
+        if (el) el.classList.add("drop-target");
+      });
+    }
+
+    function clearHighlights() {
+      document.querySelectorAll(".drop-target").forEach(el => el.classList.remove("drop-target"));
+    }
+
+    function createGhost(cardEl, event) {
+      const rect = cardEl.getBoundingClientRect();
+      const ghost = cardEl.cloneNode(true);
+      ghost.classList.add("drag-ghost");
+      ghost.dataset.startLeft = rect.left;
+      ghost.dataset.startTop = rect.top;
+      ghost.style.left = `${rect.left}px`;
+      ghost.style.top = `${rect.top}px`;
+      document.getElementById("fxLayer").appendChild(ghost);
+      moveGhost(ghost, event.clientX, event.clientY);
+      return ghost;
+    }
+
+    function moveGhost(ghost, x, y) {
+      ghost.style.left = `${x - 75}px`;
+      ghost.style.top = `${y - 108}px`;
+    }
+
+    function snapBack(ghost) {
+      if (!ghost) return;
+      ghost.style.transition = "left 0.2s ease, top 0.2s ease, opacity 0.2s ease";
+      ghost.style.left = `${ghost.dataset.startLeft}px`;
+      ghost.style.top = `${ghost.dataset.startTop}px`;
+      ghost.style.opacity = "0";
+      setTimeout(() => ghost.remove(), 200);
+    }
+
+    function removeGhost(ghost) {
+      if (ghost && ghost.parentNode) ghost.remove();
+    }
+
+    function getTargetElement(target) {
+      if (!target) return null;
+      if (target.kind === "player") {
+        return document.querySelector(`[data-player-face='${target.playerId}']`);
+      }
+      if (target.kind === "unit") {
+        return document.querySelector(`[data-unit-id='${target.unitId}'][data-player-id='${target.playerId}']`);
+      }
+      if (target.kind === "board") {
+        return document.querySelector(`[data-target-kind='board'][data-player-id='${target.playerId}']`);
+      }
+      return null;
+    }
+
+    function getCardRect(cardId, playerId) {
+      const el = document.querySelector(`[data-card-id='${cardId}'][data-player-id='${playerId}']`);
+      return el ? el.getBoundingClientRect() : null;
+    }
+
+    function getBoardRect(playerId) {
+      const el = document.querySelector(`[data-target-kind='board'][data-player-id='${playerId}']`);
+      return el ? el.getBoundingClientRect() : null;
+    }
+
+    function getTargetRect(target) {
+      const el = getTargetElement(target);
+      return el ? el.getBoundingClientRect() : null;
+    }
+
+    function animateDraw(playerId) {
+      const deckEl = document.querySelector(playerId === "A" ? "#playerAMeta" : "#playerBMeta");
+      const handEl = document.getElementById(playerId === "A" ? "playerAHand" : "playerBHand");
+      if (!deckEl || !handEl) return;
+      const start = deckEl.getBoundingClientRect();
+      const end = handEl.getBoundingClientRect();
+      animateGhost(start, end);
+    }
+
+    function animatePlay(startRect, endRect) {
+      if (!startRect || !endRect) return;
+      animateGhost(startRect, endRect);
+    }
+
+    function animateAttack(attacker, target) {
+      const startRect = getTargetRect({ kind: "unit", playerId: attacker.owner, unitId: attacker.id });
+      const endRect = getTargetRect(target);
+      if (!startRect || !endRect) return;
+      animateGhost(startRect, endRect, true);
+      flashTarget(target);
+    }
+
+    function animateGhost(startRect, endRect, isAttack = false) {
+      const ghost = document.createElement("div");
+      ghost.className = "drag-ghost";
+      ghost.style.left = `${startRect.left}px`;
+      ghost.style.top = `${startRect.top}px`;
+      document.getElementById("fxLayer").appendChild(ghost);
+      const dx = endRect.left - startRect.left;
+      const dy = endRect.top - startRect.top;
+      requestAnimationFrame(() => {
+        ghost.style.transition = isAttack ? "transform 0.25s ease" : "transform 0.35s ease";
+        ghost.style.transform = `translate(${dx}px, ${dy}px)`;
+      });
+      setTimeout(() => ghost.remove(), isAttack ? 300 : 380);
+    }
+
+    function spawnDamage(target, amount) {
+      const rect = getTargetRect(target);
+      if (!rect) return;
+      const pop = document.createElement("div");
+      pop.className = "damage-pop";
+      pop.textContent = `-${amount}`;
+      pop.style.left = `${rect.left + rect.width / 2}px`;
+      pop.style.top = `${rect.top + rect.height / 2}px`;
+      document.getElementById("fxLayer").appendChild(pop);
+      setTimeout(() => pop.remove(), 900);
+    }
+
+    function spawnDeathFx(unit) {
+      const rect = getTargetRect({ kind: "unit", playerId: unit.owner, unitId: unit.id });
+      if (!rect) return;
+      const impact = document.createElement("div");
+      impact.className = "impact";
+      impact.style.left = `${rect.left + rect.width / 2 - 30}px`;
+      impact.style.top = `${rect.top + rect.height / 2 - 30}px`;
+      document.getElementById("fxLayer").appendChild(impact);
+      setTimeout(() => impact.remove(), 500);
+    }
+
+    function flashTarget(target) {
+      const rect = getTargetRect(target);
+      if (!rect) return;
+      const impact = document.createElement("div");
+      impact.className = "impact";
+      impact.style.left = `${rect.left + rect.width / 2 - 30}px`;
+      impact.style.top = `${rect.top + rect.height / 2 - 30}px`;
+      document.getElementById("fxLayer").appendChild(impact);
+      setTimeout(() => impact.remove(), 500);
+    }
+
+    function flashBoard() {
+      const fx = document.createElement("div");
+      fx.className = "impact";
+      fx.style.left = "50%";
+      fx.style.top = "50%";
+      fx.style.transform = "translate(-50%, -50%)";
+      fx.style.width = "220px";
+      fx.style.height = "220px";
+      document.getElementById("fxLayer").appendChild(fx);
+      setTimeout(() => fx.remove(), 500);
+    }
+
+    function showTurnBanner(text) {
+      const banner = document.getElementById("turnBanner");
+      banner.textContent = text;
+      banner.classList.add("show");
+      setTimeout(() => banner.classList.remove("show"), 1200);
+    }
+
+    function openZoom(cardEl) {
+      const overlay = document.getElementById("zoomOverlay");
+      const slot = document.getElementById("zoomCard");
+      slot.innerHTML = "";
+      const clone = cardEl.cloneNode(true);
+      clone.classList.remove("drag-ghost");
+      clone.classList.remove("shake");
+      clone.classList.remove("drop-target");
+      clone.style.transform = "none";
+      slot.appendChild(clone);
+      overlay.classList.add("active");
+    }
+
+    function closeZoom() {
+      document.getElementById("zoomOverlay").classList.remove("active");
+    }
+
+    document.getElementById("newGameBtn").addEventListener("click", newGame);
+    document.getElementById("logToggleBtn").addEventListener("click", () => {
+      state.logCollapsed = !state.logCollapsed;
+      renderLog();
+    });
+    document.getElementById("logToggleMobile").addEventListener("change", (e) => {
+      state.showLog = e.target.checked;
+      render();
+    });
+    document.getElementById("privacyToggleMobile").addEventListener("change", (e) => {
+      state.settings.privacy = e.target.checked;
+      const desktop = document.getElementById("privacyToggle");
+      if (desktop) desktop.checked = e.target.checked;
+      render();
+    });
+    document.getElementById("confirmToggleMobile").addEventListener("change", (e) => {
+      state.settings.confirmDangerous = e.target.checked;
+      const desktop = document.getElementById("confirmToggle");
+      if (desktop) desktop.checked = e.target.checked;
+    });
+    document.getElementById("sfxToggleMobile").addEventListener("change", (e) => {
+      state.settings.sfxPulse = e.target.checked;
+      const desktop = document.getElementById("sfxToggle");
+      if (desktop) desktop.checked = e.target.checked;
+    });
+    document.querySelectorAll("[data-end-turn]").forEach(btn => btn.addEventListener("click", endTurn));
+    document.getElementById("hamburgerBtn").addEventListener("click", () => {
+      document.getElementById("mobileMenu").classList.toggle("active");
+    });
+    document.getElementById("mobileMenu").addEventListener("click", (event) => {
+      if (event.target.id === "mobileMenu") event.currentTarget.classList.remove("active");
+    });
+    document.getElementById("passOverlay").addEventListener("click", () => {
+      if (!state.passOverlay.active) return;
+      finalizeTurnSwitch(state.passOverlay.nextPlayer);
+    });
+    document.getElementById("passContinue").addEventListener("click", () => {
+      if (!state.passOverlay.active) return;
+      finalizeTurnSwitch(state.passOverlay.nextPlayer);
+    });
+    document.getElementById("confirmYes").addEventListener("click", () => resolveConfirm(true));
+    document.getElementById("confirmNo").addEventListener("click", () => resolveConfirm(false));
+    document.getElementById("zoomOverlay").addEventListener("click", closeZoom);
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
+    document.addEventListener("pointerup", () => {
+      document.querySelectorAll(".hand-zone .card.touch-active").forEach(el => el.classList.remove("touch-active"));
+    });
+    document.addEventListener("click", (event) => {
+      if (Date.now() < state.suppressClickUntil) return;
+      if (state.drag || state.passOverlay.active) return;
+      const card = event.target.closest(".card");
+      if (!card || card.classList.contains("back")) return;
+      openZoom(card);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.target && ["INPUT", "TEXTAREA"].includes(event.target.tagName)) return;
+      if (event.code === "Space") {
+        event.preventDefault();
+        endTurn();
+      }
+      if (event.key.toLowerCase() === "n") {
+        newGame();
+      }
+    });
+
+    newGame();
+  </script>
+</body>
+</html>
