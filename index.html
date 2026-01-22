@@ -809,6 +809,7 @@
       showLog: false,
       drag: null,
       suppressClickUntil: 0,
+      tapCandidate: null,
       passOverlay: { active: false, nextPlayer: 0 },
       confirm: null,
       settings: {
@@ -1488,6 +1489,13 @@
       if (!card || card.classList.contains("back")) return;
       if (event.pointerType === "touch") event.preventDefault();
       state.suppressClickUntil = Date.now() + 500;
+      state.tapCandidate = {
+        id: card.dataset.cardId,
+        x: event.clientX,
+        y: event.clientY,
+        time: Date.now(),
+        pointerType: event.pointerType || "mouse"
+      };
       if (card.setPointerCapture) {
         try { card.setPointerCapture(event.pointerId); } catch (err) {}
       }
@@ -1678,7 +1686,7 @@
     function getTargetElement(target) {
       if (!target) return null;
       if (target.kind === "player") {
-        return document.querySelector(`[data-player-face='${target.playerId}']`);
+        return document.querySelector(`[data-target-kind='player'][data-player-id='${target.playerId}']`);
       }
       if (target.kind === "unit") {
         return document.querySelector(`[data-unit-id='${target.unitId}'][data-player-id='${target.playerId}']`);
@@ -1858,8 +1866,20 @@
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("pointermove", handlePointerMove);
     document.addEventListener("pointerup", handlePointerUp);
-    document.addEventListener("pointerup", () => {
+    document.addEventListener("pointerup", (event) => {
       document.querySelectorAll(".hand-zone .card.touch-active").forEach(el => el.classList.remove("touch-active"));
+      if (state.drag || state.passOverlay.active) { state.tapCandidate = null; return; }
+      if (!state.tapCandidate) return;
+      const now = Date.now();
+      if (now - state.tapCandidate.time > 400) { state.tapCandidate = null; return; }
+      const dx = Math.abs((state.tapCandidate.x || 0) - (event.clientX || 0));
+      const dy = Math.abs((state.tapCandidate.y || 0) - (event.clientY || 0));
+      if (dx > 8 || dy > 8) { state.tapCandidate = null; return; }
+      const tapped = document.querySelector(`[data-card-id='${state.tapCandidate.id}']`);
+      if (tapped && !tapped.classList.contains("back")) {
+        openZoom(tapped);
+      }
+      state.tapCandidate = null;
     });
     document.addEventListener("click", (event) => {
       if (Date.now() < state.suppressClickUntil) return;
