@@ -36,6 +36,9 @@
       background: radial-gradient(circle at top, #21434a 0%, #0e2126 40%, #071216 100%);
       min-height: 100vh;
       overflow-x: hidden;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
     .play-area { max-width: 100%; }
     .table {
@@ -218,6 +221,15 @@
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       user-select: none;
       touch-action: none;
+    }
+    .card, .card * {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .card img {
+      -webkit-user-drag: none;
+      user-drag: none;
     }
     .card.arted {
       background: #101418;
@@ -808,6 +820,8 @@
       logCollapsed: true,
       showLog: false,
       drag: null,
+      pendingDrag: null,
+      pointerPos: null,
       suppressClickUntil: 0,
       tapCandidate: null,
       passOverlay: { active: false, nextPlayer: 0 },
@@ -1489,25 +1503,19 @@
       if (!card || card.classList.contains("back")) return;
       if (event.pointerType === "touch") event.preventDefault();
       state.suppressClickUntil = Date.now() + 500;
-      state.tapCandidate = {
-        id: card.dataset.cardId,
-        x: event.clientX,
-        y: event.clientY,
-        time: Date.now(),
-        pointerType: event.pointerType || "mouse"
-      };
       if (card.setPointerCapture) {
         try { card.setPointerCapture(event.pointerId); } catch (err) {}
       }
+      state.pendingDrag = {
+        cardEl: card,
+        x: event.clientX,
+        y: event.clientY,
+        time: Date.now()
+      };
       const zone = card.dataset.zone;
       if (zone === "hand") {
         document.querySelectorAll(".hand-zone .card.touch-active").forEach(el => el.classList.remove("touch-active"));
         card.classList.add("touch-active");
-      }
-      if (zone === "hand") {
-        startDragFromHand(card, event);
-      } else if (zone === "board") {
-        startDragFromBoard(card, event);
       }
     }
 
@@ -1562,22 +1570,51 @@
     }
 
     function handlePointerMove(event) {
+      state.pointerPos = { x: event.clientX, y: event.clientY };
+      if (state.pendingDrag && !state.drag) {
+        const dx = Math.abs((state.pendingDrag.x || 0) - (event.clientX || 0));
+        const dy = Math.abs((state.pendingDrag.y || 0) - (event.clientY || 0));
+        if (dx > 8 || dy > 8) {
+          const card = state.pendingDrag.cardEl;
+          const zone = card.dataset.zone;
+          if (zone === "hand") {
+            startDragFromHand(card, event);
+          } else if (zone === "board") {
+            startDragFromBoard(card, event);
+          }
+          state.pendingDrag = null;
+        }
+      }
       if (!state.drag) return;
       moveGhost(state.drag.ghost, event.clientX, event.clientY);
     }
 
     function handlePointerUp(event) {
-      if (!state.drag) return;
       const card = event.target.closest(".card");
       if (card && card.releasePointerCapture) {
         try { card.releasePointerCapture(event.pointerId); } catch (err) {}
       }
+      if (state.pendingDrag) {
+        const tapped = state.pendingDrag.cardEl;
+        state.pendingDrag = null;
+        if (tapped && !tapped.classList.contains("back")) {
+          openZoom(tapped);
+        }
+        return;
+      }
+      if (!state.drag) return;
       const drag = state.drag;
-      const targetEl = document.elementFromPoint(event.clientX, event.clientY);
+      const dropX = (event.pointerType === "touch" && event.clientX === 0 && event.clientY === 0)
+        ? (state.pointerPos ? state.pointerPos.x : event.clientX)
+        : event.clientX;
+      const dropY = (event.pointerType === "touch" && event.clientX === 0 && event.clientY === 0)
+        ? (state.pointerPos ? state.pointerPos.y : event.clientY)
+        : event.clientY;
+      const targetEl = document.elementFromPoint(dropX, dropY);
       const dropTarget = findTargetFromElement(targetEl);
       clearHighlights();
       if (!dropTarget || !isTargetValid(dropTarget, drag.targets)) {
-        snapBack(drag.ghost, event.clientX, event.clientY);
+        snapBack(drag.ghost);
         toast("Illegal action.", true);
         state.drag = null;
         return;
@@ -1868,25 +1905,13 @@
     document.addEventListener("pointerup", handlePointerUp);
     document.addEventListener("pointerup", (event) => {
       document.querySelectorAll(".hand-zone .card.touch-active").forEach(el => el.classList.remove("touch-active"));
-      if (state.drag || state.passOverlay.active) { state.tapCandidate = null; return; }
-      if (!state.tapCandidate) return;
-      const now = Date.now();
-      if (now - state.tapCandidate.time > 400) { state.tapCandidate = null; return; }
-      const dx = Math.abs((state.tapCandidate.x || 0) - (event.clientX || 0));
-      const dy = Math.abs((state.tapCandidate.y || 0) - (event.clientY || 0));
-      if (dx > 8 || dy > 8) { state.tapCandidate = null; return; }
-      const tapped = document.querySelector(`[data-card-id='${state.tapCandidate.id}']`);
-      if (tapped && !tapped.classList.contains("back")) {
-        openZoom(tapped);
-      }
-      state.tapCandidate = null;
+      if (state.passOverlay.active) state.pendingDrag = null;
     });
-    document.addEventListener("click", (event) => {
-      if (Date.now() < state.suppressClickUntil) return;
-      if (state.drag || state.passOverlay.active) return;
-      const card = event.target.closest(".card");
-      if (!card || card.classList.contains("back")) return;
-      openZoom(card);
+    document.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
+    document.addEventListener("gesturestart", (event) => {
+      event.preventDefault();
     });
 
     document.addEventListener("keydown", (event) => {
